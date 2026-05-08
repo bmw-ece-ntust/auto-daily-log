@@ -24,8 +24,13 @@ auto-daily-log/
 ├── requirements.txt               # Runtime deps: PyYAML; optional Google Calendar libs
 ├── .sop-hash                      # SHA-256[:16] of the SOP ## Auto Daily-log section
 ├── .github/
+│   ├── copilot-instructions.md    # Per-repo Copilot context (project purpose, conventions)
 │   └── workflows/
 │       └── sop-check.yml          # Midnight weekday check against SOP (needs SOP_READ_TOKEN secret)
+├── lab-automation/
+│   ├── setup-memory.sh            # Bootstrap: writes ~/.claude/settings.json, mcp.json, ~/CLAUDE.md, ~/.copilot/instructions.md
+│   ├── global-claude.md           # Source for ~/CLAUDE.md (global Claude memory instructions)
+│   └── global-copilot.md          # Source for ~/.copilot/instructions.md (global Copilot instructions)
 └── src/dailylog/
     ├── cli.py                     # Argument parser and main orchestration
     ├── config.py                  # YAML → frozen dataclasses (AppConfig and sub-configs)
