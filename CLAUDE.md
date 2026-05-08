@@ -142,6 +142,23 @@ If the `## Auto Daily-log` section hash changes from `.sop-hash`, the workflow o
 
 ---
 
+## Long-Term Memory (MySQL)
+
+The `mysql-memory` MCP server is configured globally in `~/.claude/settings.json` and connects to `llm_memory` on the BMW Lab VM via SSH tunnel on `localhost:3307`. The tunnel is managed by `launchd` (`com.bmwlab.mysql-tunnel`).
+
+**Session start** — load last 5 sessions:
+```sql
+SELECT s.id, s.repo, s.start_at, s.end_at, s.commit_title, ss.summary
+FROM sessions s LEFT JOIN session_summaries ss ON ss.session_id = s.id
+ORDER BY s.start_at DESC LIMIT 5;
+```
+
+**Session end** — insert before committing: `sessions` → `prompts` → `session_summaries`, then `UPDATE sessions SET result_commit` after push. Full procedure: [SOP lab-automation/llm-memory.md](https://github.com/bmw-ece-ntust/SOP/blob/master/lab-automation/llm-memory.md).
+
+Bootstrap a new machine: `bash lab-automation/setup-memory.sh`
+
+---
+
 ## Conventions
 
 - Always run `--dry-run` first; switch to `--apply` only after confirming output
