@@ -5,6 +5,8 @@ __pycache__/
 
 # Config (copy from env.example.yaml, do not commit personal config)
 env.yaml
+# Private secrets overlay (copy from env.local.example.yaml, never commit)
+env.local.yaml
 
 # Generated output
 reminder.md

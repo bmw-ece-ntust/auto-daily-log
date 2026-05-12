@@ -24,7 +24,7 @@ class Commit:
 
 
 def _run(cmd: list[str], *, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, input=input_text, text=True, capture_output=True)
+    return subprocess.run(cmd, input=input_text, capture_output=True, encoding="utf-8", errors="replace")
 
 
 def gh_api_json(args: list[str], *, input_json: dict[str, Any] | None = None) -> Any:

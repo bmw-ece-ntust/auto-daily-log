@@ -74,6 +74,11 @@ def main() -> int:
         action="store_true",
         help="Append commits as new bullets under **Daily-logs** when not already referenced",
     )
+    ap.add_argument(
+        "--skip-if-no-activity",
+        action="store_true",
+        help="With --ensure-comments, skip creating a new day comment when no commits exist for that day",
+    )
     ap.add_argument("--include-overleaf", action="store_true")
     ap.add_argument(
         "--link-to-files",
@@ -250,6 +255,9 @@ def main() -> int:
                 getattr(cfg, "planning", None) is not None and cfg.planning.enabled
             )
             seed_commits = args.seed_from_commits or cfg.github.seed_new_day_from_commits
+
+            if args.skip_if_no_activity and not commits:
+                continue
 
             if seed_plans:
                 planning = getattr(cfg, "planning", None)

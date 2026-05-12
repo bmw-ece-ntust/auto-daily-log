@@ -21,8 +21,13 @@ Spec: [SOP daily-log.md § Auto Daily-log](https://github.com/bmw-ece-ntust/SOP/
 auto-daily-log/
 ├── main.py                        # Entrypoint: adds src/ to path, auto-loads env.yaml
 ├── env.example.yaml               # Config template — copy to env.yaml (safe to commit)
+├── env.local.example.yaml         # Template for gitignored private overrides → env.local.yaml
+├── reorder-comments.py            # Standalone: gap analysis + chronological reorder of issue comments
+├── fill-from-calendar.py          # Standalone: fill missing entries from ICS/iCal feed or OAuth
 ├── requirements.txt               # Runtime deps: PyYAML; optional Google Calendar libs
 ├── .sop-hash                      # SHA-256[:16] of the SOP ## Auto Daily-log section
+├── .claude/
+│   └── settings.local.json        # Project-local Claude Code permissions (bypassPermissions)
 ├── .github/
 │   ├── copilot-instructions.md    # Per-repo Copilot context (project purpose, conventions)
 │   └── workflows/
@@ -34,7 +39,7 @@ auto-daily-log/
 └── src/dailylog/
     ├── cli.py                     # Argument parser and main orchestration
     ├── config.py                  # YAML → frozen dataclasses (AppConfig and sub-configs)
-    ├── github_api.py              # GitHub commit search + issue comment CRUD via gh CLI
+    ├── github_api.py              # GitHub commit search + issue comment CRUD via gh CLI (utf-8 safe)
     ├── dailylog_md.py             # Markdown parse/patch: bullet regex, time-range update, commit linking
     ├── gcal.py                    # Google Calendar OAuth2 integration
     ├── planning.py                # Suggestion ranking from issue body or local markdown files
@@ -48,11 +53,11 @@ auto-daily-log/
 
 ---
 
-## Config (`env.yaml`)
+## Config
 
-Copy `env.example.yaml` → `env.yaml`. The file is safe to commit — no secrets.
+### `env.yaml` (committed, no secrets)
 
-Key fields:
+Copy `env.example.yaml` → `env.yaml`.
 
 | Field | Purpose |
 |---|---|
@@ -65,10 +70,20 @@ Key fields:
 | `github.append_unmatched_commits` | Append unreferenced commits as new bullets |
 | `timeline.lookback_days` | Default window for missing-date checks |
 | `timeline.start_date` | Historical start for full backfill |
-| `google_calendar.*` | Optional calendar integration |
+| `google_calendar.*` | Optional OAuth2 calendar integration |
 | `planning.*` | Optional task suggestion seeding |
 | `overleaf.*` | Optional Overleaf local-git summary |
 | `llm.*` | Optional OpenAI-compatible LLM analysis |
+
+### `env.local.yaml` (gitignored, secrets)
+
+Copy `env.local.example.yaml` → `env.local.yaml`. Used by `fill-from-calendar.py`.
+
+| Field | Purpose |
+| --- | --- |
+| `google_calendar.ical_url` | Private iCal URL (Google Calendar → Settings → "Secret address in iCal format") |
+| `google_calendar.calendar_id` | Calendar ID for OAuth path (e.g. `user@gapps.ntust.edu.tw`) |
+| `google_calendar.exclude_keywords` | Substrings that mark an event as personal (case-insensitive); matched events are skipped |
 
 ---
 
@@ -99,9 +114,10 @@ Rules:
 ## Authentication
 
 | Service | Method |
-|---|---|
+| --- | --- |
 | GitHub | `gh auth login` — no tokens in files |
-| Google Calendar | OAuth2 — `credentials.json` from Google Cloud Console, cached `token.json` |
+| Google Calendar (OAuth2) | `credentials.json` from Google Cloud Console, cached `token.json`; browser redirect via `InstalledAppFlow.run_local_server` |
+| Google Calendar (iCal) | Private iCal URL in `env.local.yaml` — no OAuth needed; acts as a bearer token in the URL |
 
 ---
 
@@ -129,9 +145,33 @@ Order of operations per run:
 2. Optionally fetch Google Calendar events
 3. Fetch commits from all configured sources
 4. `--ensure-comments` → create missing day comments (seeded from commits or plans)
+   - `--skip-if-no-activity` — skip creating a stub when no commits exist for that day
 5. Patch existing comments: fill end times, add evidence links, append unmatched commits
 6. `--include-overleaf` → append Overleaf summary
 7. `--generate-reminder` → write reminder.md
+
+### Gap analysis and reorder (`reorder-comments.py`)
+
+Standalone script — does not use `env.yaml`.
+
+- Fetches all comments from the configured issue via `gh issue view --json comments`
+- Separates dated entries (matching `### YYYY/MM/DD`) from undated/administrative ones
+- Reports missing weekdays in a configurable `--since` / `--until` window
+- Reports out-of-order dated entries
+- `--apply` — deletes all dated comments and recreates them in sorted order (destructive; dry-run by default)
+- `--gcal` — cross-checks missing days against Google Calendar (uses `gcal.py` OAuth flow)
+
+### Calendar-seeded backfill (`fill-from-calendar.py`)
+
+Standalone script — reads private config from `env.local.yaml`.
+
+- Source priority: CLI argument (file path or URL) → `ical_url` from `env.local.yaml` → `--oauth` flag
+- Parses ICS bytes via the `icalendar` library; converts all datetimes to Asia/Taipei
+- Deduplicates recurring meeting invites on `(start, end, summary)` tuple
+- Filters personal events via `google_calendar.exclude_keywords` from `env.local.yaml`
+- Reports missing weekdays that have calendar events, formatted as ready-to-paste daily-log bullets (`HH.MM` dot notation)
+- `--create` — posts a new daily-log comment for each missing day with events
+- `--all` — also audits days that already have a log entry (for cross-referencing)
 
 ---
 
